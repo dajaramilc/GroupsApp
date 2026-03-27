@@ -6,7 +6,13 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
+# `prepared_statement_cache_size: 0` is required for pgBouncer/Transaction Poolers like Supabase IPv4 Pooler.
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,
+    future=True,
+    connect_args={"prepared_statement_cache_size": 0}
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
