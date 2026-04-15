@@ -1,0 +1,139 @@
+# ── CI/CD Pipeline para GroupsApp ────────────────────────
+# Se ejecuta con cada push a main. Despliega backend a Lightsail y frontend a S3/CloudFront.
+name: Deploy GroupsApp
+
+on:
+  push:
+    branches: [main]
+
+# Permisos mínimos necesarios para el workflow
+permissions:
+  contents: read
+
+jobs:
+  # ── Job 1: Desplegar Backend en Lightsail Container ────
+  deploy-backend:
+    name: "🐳 Backend → Lightsail"
+    runs-on: ubuntu-latest
+    steps:
+      # Paso 1: Obtener el código fuente
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # Paso 2: Configurar credenciales de AWS para todos los comandos siguientes
+      - name: Configurar AWS CLI
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Paso 3: Instalar el plugin lightsailctl para poder subir imágenes
+      - name: Instalar plugin Lightsail
+        run: |
+          curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+          chmod +x /usr/local/bin/lightsailctl
+
+      # Paso 4: Construir la imagen Docker de producción
+      - name: Build Docker image
+        run: docker build -t groupsapp:latest .
+
+      # Paso 5: Subir imagen al Container Service de Lightsail
+      - name: Push imagen a Lightsail
+        run: |
+          aws lightsail push-container-image \
+            --service-name ${{ secrets.LIGHTSAIL_SERVICE_NAME }} \
+            --label groupsapp \
+            --image groupsapp:latest \
+            --region ${{ secrets.AWS_REGION }} 2>&1 | tee push-output.txt
+
+          # Extraer el nombre completo de la imagen subida para usarla en el despliegue
+          IMAGE_TAG=$(grep -oP '":.*"' push-output.txt | tr -d '"' | tail -1)
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "📦 Imagen subida: $IMAGE_TAG"
+
+      # Paso 6: Crear nuevo despliegue con la imagen actualizada y variables de entorno
+      - name: Desplegar en Lightsail
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          S3_BUCKET_UPLOADS: ${{ secrets.S3_BUCKET_UPLOADS }}
+          CLOUDFRONT_DOMAIN: ${{ secrets.CLOUDFRONT_DOMAIN }}
+        run: |
+          cat > /tmp/deploy.json << EOF
+          {
+            "containers": {
+              "groupsapp": {
+                "image": "${{ env.IMAGE_TAG }}",
+                "environment": {
+                  "APP_NAME": "GroupsApp",
+                  "DEBUG": "false",
+                  "DATABASE_URL": "${DATABASE_URL}",
+                  "JWT_SECRET_KEY": "${JWT_SECRET_KEY}",
+                  "JWT_ALGORITHM": "HS256",
+                  "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "1440",
+                  "STORAGE_BACKEND": "s3",
+                  "S3_BUCKET_UPLOADS": "${S3_BUCKET_UPLOADS}",
+                  "S3_REGION": "${{ secrets.AWS_REGION }}",
+                  "AWS_ACCESS_KEY_ID": "${{ secrets.AWS_ACCESS_KEY_ID }}",
+                  "AWS_SECRET_ACCESS_KEY": "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+                  "MAX_UPLOAD_SIZE_MB": "10",
+                  "PRESENCE_TIMEOUT_SECONDS": "120",
+                  "CORS_ORIGINS": "https://${CLOUDFRONT_DOMAIN}"
+                },
+                "ports": {
+                  "8000": "HTTP"
+                }
+              }
+            },
+            "publicEndpoint": {
+              "containerName": "groupsapp",
+              "containerPort": 8000,
+              "healthCheck": {
+                "path": "/health",
+                "intervalSeconds": 30,
+                "timeoutSeconds": 5,
+                "healthyThreshold": 2,
+                "unhealthyThreshold": 3
+              }
+            }
+          }
+          EOF
+
+          aws lightsail create-container-service-deployment \
+            --service-name ${{ secrets.LIGHTSAIL_SERVICE_NAME }} \
+            --cli-input-json file:///tmp/deploy.json \
+            --region ${{ secrets.AWS_REGION }}
+
+          echo "✅ Despliegue de backend iniciado exitosamente"
+
+  # ── Job 2: Desplegar Frontend a S3 y limpiar cache de CloudFront ──
+  deploy-frontend:
+    name: "🌐 Frontend → S3/CloudFront"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar AWS CLI
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Sincronizar archivos estáticos del frontend a S3
+      - name: Subir frontend a S3
+        run: |
+          aws s3 sync ./static s3://${{ secrets.S3_FRONTEND_BUCKET }} \
+            --delete \
+            --cache-control "public, max-age=300"
+          echo "✅ Frontend sincronizado con S3"
+
+      # Invalidar cache de CloudFront para que los cambios se reflejen inmediatamente
+      - name: Invalidar cache CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+          echo "✅ Cache de CloudFront invalidada"
