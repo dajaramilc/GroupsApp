@@ -20,7 +20,7 @@
 
 📂 **Documentación completa (Google Drive):**
 
-🔗 [Enlace a la documentación en Drive](facebook.com)
+🔗 [Enlace a la documentación en Drive](https://drive.google.com/drive/folders/1_db6ZG_MfIgfIV2jSE0itZEh5_yaPxaF)
 
 ---
 
