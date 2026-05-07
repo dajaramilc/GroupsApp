@@ -32,11 +32,76 @@
 
 ---
 
+## 🌐 Aplicación Desplegada en AWS
+
+> La aplicación está **actualmente en producción** en infraestructura AWS. Puedes acceder y probarla directamente sin configuración local.
+
+### 🔗 URLs de Acceso
+
+| Recurso | URL | Estado |
+|---------|-----|--------|
+| **🖥️ Frontend (SPA)** | [groupsapp-frontend-diego2026.s3-website-us-east-1.amazonaws.com](http://groupsapp-frontend-diego2026.s3-website-us-east-1.amazonaws.com/) | 🟢 En línea |
+| **⚙️ Backend API** | [54.89.185.158:8000](http://54.89.185.158:8000) | 🟢 En línea |
+| **📖 Swagger UI (Docs)** | [54.89.185.158:8000/docs](http://54.89.185.158:8000/docs) | 🟢 En línea |
+| **🏥 Health Check** | [54.89.185.158:8000/health](http://54.89.185.158:8000/health) | 🟢 En línea |
+
+### 🏗️ Infraestructura AWS Desplegada
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   PRODUCCIÓN AWS                        │
+│                                                         │
+│  [Usuario] ──HTTPS──> [S3 Static Website]               │
+│                       (Frontend SPA)                    │
+│                            │                            │
+│                            │ API REST HTTP               │
+│                            ▼                            │
+│                   [EC2 Instance]                        │
+│              GroupsApp-Backend                          │
+│              i-0a8fc1600071270d6                        │
+│              IP: 54.89.185.158                          │
+│              Uvicorn + FastAPI (:8000)                  │
+│                            │                            │
+│                            ▼                            │
+│                   [PostgreSQL - Supabase]               │
+│                   (Base de datos gestionada)            │
+│                            │                            │
+│                            ▼                            │
+│                   [S3 Bucket - Uploads]                 │
+│                   (Archivos adjuntos)                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 🖥️ Instancia EC2 en Producción
+
+| Campo | Valor |
+|-------|-------|
+| **Nombre** | `GroupsApp-Backend` |
+| **Instance ID** | `i-0a8fc1600071270d6` |
+| **Public IPv4** | `54.89.185.158` |
+| **Private IPv4** | `172.31.22.79` |
+| **Puerto aplicación** | `8000` |
+| **Servicio** | EC2 (IaaS) — AWS us-east-1 |
+
+![EC2 Instance GroupsApp-Backend corriendo en AWS](docs/aws-ec2-instance.png)
+
+### ☁️ Servicios AWS Utilizados
+
+| Servicio | Tipo | Rol en el Sistema |
+|---|---|---|
+| **EC2** | IaaS | Servidor del backend FastAPI + Uvicorn |
+| **S3** (Frontend) | PaaS / Managed Storage | Hosting del frontend estático (SPA) |
+| **S3** (Uploads) | PaaS / Managed Storage | Almacenamiento de archivos adjuntos |
+| **Supabase PostgreSQL** | DBaaS | Base de datos gestionada con connection pooling |
+
+---
+
 ## 📋 Tabla de Contenidos
 
 - [👥 Integrantes del Equipo](#-integrantes-del-equipo)
 - [📄 Documentación del Proyecto](#-documentación-del-proyecto)
 - [🎥 Video de Demostración](#-video-de-demostración)
+- [🌐 Aplicación Desplegada en AWS](#-aplicación-desplegada-en-aws)
 - [🌟 Funcionalidades Principales](#-funcionalidades-principales)
 - [🛠 Stack Tecnológico](#-stack-tecnológico)
 - [🏗 Arquitectura del Sistema](#-arquitectura-del-sistema)
