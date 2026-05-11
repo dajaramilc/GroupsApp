@@ -8,3 +8,22 @@ dist/
 build/
 .venv/
 venv/
+docker-compose.override.yml
+
+# Secretos / claves
+*.pem
+*.key
+
+# AWS infra outputs (no commitear; varían por cuenta)
+cloudfront-info.txt
+frontend-bucket.txt
+uploads-bucket.txt
+sg_id.txt
+cloudfront-config.json
+s3-bucket-policy.json
+s3-website.json
+
+# Logs locales
+logs.txt
+logs2.txt
+*.log

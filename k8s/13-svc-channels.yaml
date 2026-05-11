@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-channels
+  namespace: groupsapp
+  labels: { app: svc-channels }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: svc-channels }
+  template:
+    metadata:
+      labels: { app: svc-channels }
+    spec:
+      containers:
+        - name: svc-channels
+          image: dajaramilc/groupsapp-svc-channels:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8004
+              name: http
+            - containerPort: 50051
+              name: grpc
+          envFrom:
+            - secretRef: { name: app-secrets }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "300m", memory: "256Mi" }
+          readinessProbe:
+            httpGet: { path: /health, port: 8004 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-channels
+  namespace: groupsapp
+spec:
+  selector: { app: svc-channels }
+  ports:
+    - name: http
+      port: 8004
+      targetPort: 8004
+    - name: grpc
+      port: 50051
+      targetPort: 50051

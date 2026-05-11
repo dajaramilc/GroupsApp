@@ -17,6 +17,6 @@ COPY services/svc-channels/main.py ./app/main.py
 
 RUN mkdir -p /app/uploads
 
-EXPOSE 8004
+EXPOSE 8004 50051
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004"]

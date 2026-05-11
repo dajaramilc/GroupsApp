@@ -2,7 +2,7 @@
    GroupsApp – Frontend Application Logic
    ═══════════════════════════════════════════════════════════ */
 
-const API = '';  // Same origin
+const API = 'http://52.7.253.122';  // K8s cluster gateway (EC2 #1 Elastic IP)
 
 // ── State ─────────────────────────────────────────────────
 let state = {
@@ -438,9 +438,9 @@ $('#btn-view-members').addEventListener('click', async () => {
                 <div class="avatar small">${m.display_name.charAt(0).toUpperCase()}</div>
                 <span class="item-name">${esc(m.display_name)} <small style="color:var(--text-muted)">@${esc(m.username)}</small></span>
                 <span class="member-role ${m.role}">${m.role}</span>
-                ${state.currentGroupAdmin === state.user.id && m.user_id !== state.user.id 
-                    ? `<button class="icon-btn btn-danger btn-remove-member" data-user-id="${m.user_id}" title="Expulsar miembro" style="width:28px;height:28px;font-size:12px;margin-left:auto;">❌</button>` 
-                    : ''}
+                ${state.currentGroupAdmin === state.user.id && m.user_id !== state.user.id
+                ? `<button class="icon-btn btn-danger btn-remove-member" data-user-id="${m.user_id}" title="Expulsar miembro" style="width:28px;height:28px;font-size:12px;margin-left:auto;">❌</button>`
+                : ''}
             </div>
         `).join('');
 
@@ -543,7 +543,7 @@ async function loadMessages() {
         if (state.currentChatType === 'dm') {
             for (const m of state.messages) {
                 if (m.sender_id !== state.user.id) {
-                    api(`/messages/${m.id}/read`, { method: 'POST' }).catch(() => {});
+                    api(`/messages/${m.id}/read`, { method: 'POST' }).catch(() => { });
                 }
             }
         }

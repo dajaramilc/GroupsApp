@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError, ForbiddenError
+from app.grpc_clients.channels_client import check_channel_access
 from app.models.user import User
 from app.modules.channels.repository import ChannelRepository
 from app.modules.groups.repository import GroupRepository
@@ -36,14 +37,22 @@ class MessageService:
     async def send_channel_message(
         db: AsyncSession, channel_id: UUID, data: SendMessageRequest, current_user: User
     ) -> MessageResponse:
-        channel = await ChannelRepository.get_by_id(db, channel_id)
-        if not channel:
-            raise NotFoundError("Channel not found")
-
-        # Check group membership
-        member = await GroupRepository.get_member(db, channel.group_id, current_user.id)
-        if not member:
-            raise ForbiddenError("Not a member of the channel's group")
+        # Verificación de acceso vía gRPC (svc-messages → svc-channels)
+        # Fallback a verificación local si el RPC falla (resiliencia ante caída del servicio).
+        allowed, _group_id, reason = await check_channel_access(channel_id, current_user.id)
+        if reason == "grpc_unavailable":
+            # Fallback: replicar la verificación local
+            channel = await ChannelRepository.get_by_id(db, channel_id)
+            if not channel:
+                raise NotFoundError("Channel not found")
+            member = await GroupRepository.get_member(db, channel.group_id, current_user.id)
+            if not member:
+                raise ForbiddenError("Not a member of the channel's group")
+        else:
+            if reason == "channel_not_found":
+                raise NotFoundError("Channel not found")
+            if not allowed:
+                raise ForbiddenError("Not a member of the channel's group")
 
         msg = await MessageRepository.create_channel_message(db, current_user.id, channel_id, data.content)
         return MessageResponse.model_validate(msg)

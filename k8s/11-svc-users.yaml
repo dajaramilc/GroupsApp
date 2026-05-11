@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-users
+  namespace: groupsapp
+  labels: { app: svc-users }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: svc-users }
+  template:
+    metadata:
+      labels: { app: svc-users }
+    spec:
+      containers:
+        - name: svc-users
+          image: dajaramilc/groupsapp-svc-users:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - secretRef: { name: app-secrets }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "300m", memory: "256Mi" }
+          readinessProbe:
+            httpGet: { path: /health, port: 8002 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-users
+  namespace: groupsapp
+spec:
+  selector: { app: svc-users }
+  ports:
+    - port: 8002
+      targetPort: 8002

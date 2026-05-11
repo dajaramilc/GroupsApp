@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package groupsapp.channels;
+
+// Servicio gRPC interno expuesto por svc-channels.
+// Consumidores: svc-messages (verifica acceso antes de enviar mensajes).
+service ChannelService {
+  // Verifica si un usuario puede enviar mensajes en un canal.
+  // Resuelve: canal existe + usuario es miembro del grupo dueño del canal.
+  rpc CheckChannelAccess (CheckChannelAccessRequest) returns (CheckChannelAccessResponse);
+}
+
+message CheckChannelAccessRequest {
+  string channel_id = 1;  // UUID del canal
+  string user_id    = 2;  // UUID del usuario solicitante
+}
+
+message CheckChannelAccessResponse {
+  bool   allowed    = 1;  // true si puede enviar; false en cualquier otro caso
+  string channel_id = 2;  // eco del request
+  string group_id   = 3;  // grupo dueño del canal (vacío si no aplica)
+  string reason     = 4;  // mensaje legible para debug (ej. "channel_not_found", "not_member")
+}
