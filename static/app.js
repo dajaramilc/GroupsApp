@@ -6,7 +6,7 @@
 // En desarrollo local: dejar vacío (same origin, FastAPI sirve todo)
 // En producción AWS: URL del backend en EC2
 // IMPORTANTE: Si la IP de EC2 cambia (reinicio del lab), actualizar aquí y re-subir a S3
-const BACKEND_URL = 'http://3.91.64.185:8000';  // <-- IP pública de EC2 en Learner Lab
+const BACKEND_URL = 'http://44.223.11.202:8000';  // <-- IP pública de EC2 en Learner Lab
 const API = BACKEND_URL;
 
 // ── State ─────────────────────────────────────────────────
