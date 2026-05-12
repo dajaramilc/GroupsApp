@@ -13,3 +13,5 @@ aiofiles==24.1.0
 grpcio==1.80.0
 grpcio-tools==1.80.0
 protobuf==6.33.6
+aio-pika==9.6.2
+aiosqlite==0.20.0

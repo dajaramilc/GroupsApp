@@ -15,6 +15,9 @@ from app.modules.users.repository import UserRepository
 from app.modules.channels.repository import ChannelRepository
 
 
+from app.mom.publisher import EventPublisher
+from app.mom.events import GroupCreatedEvent, GroupMemberAddedEvent
+
 class GroupService:
 
     @staticmethod
@@ -22,8 +25,26 @@ class GroupService:
         group = await GroupRepository.create(db, data.name, data.description, current_user.id)
         # Creator becomes admin
         await GroupRepository.add_member(db, group.id, current_user.id, GroupRole.ADMIN)
-        # Auto-create #general channel
-        await ChannelRepository.create(db, group.id, "general", "Canal general del grupo", current_user.id)
+        
+        # Publicar eventos a RabbitMQ para replicación en svc-channels
+        await EventPublisher.publish(
+            GroupCreatedEvent(
+                group_id=str(group.id),
+                name=group.name,
+                description=group.description or "",
+                creator_id=str(current_user.id)
+            ),
+            routing_key="group.created"
+        )
+        await EventPublisher.publish(
+            GroupMemberAddedEvent(
+                group_id=str(group.id),
+                user_id=str(current_user.id),
+                role=GroupRole.ADMIN.value
+            ),
+            routing_key="group.member.added"
+        )
+        
         return GroupResponse.model_validate(group)
 
     @staticmethod
@@ -53,17 +74,23 @@ class GroupService:
         if not admin_member or admin_member.role != GroupRole.ADMIN:
             raise ForbiddenError("Only group admins can add members")
 
-        # Check target user exists
-        target_user = await UserRepository.get_by_id(db, data.user_id)
-        if not target_user:
-            raise NotFoundError("User not found")
-
         # Check not already a member
         existing = await GroupRepository.get_member(db, group_id, data.user_id)
         if existing:
             raise ConflictError("User is already a member of this group")
 
         member = await GroupRepository.add_member(db, group_id, data.user_id)
+        
+        # Publicar evento para replicación
+        await EventPublisher.publish(
+            GroupMemberAddedEvent(
+                group_id=str(group_id),
+                user_id=str(data.user_id),
+                role=GroupRole.MEMBER.value
+            ),
+            routing_key="group.member.added"
+        )
+        
         return GroupMemberResponse.model_validate(member)
 
     @staticmethod

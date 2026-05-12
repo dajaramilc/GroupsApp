@@ -25,8 +25,7 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-    result = await db.execute(select(User).where(User.id == UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-    return user
+    # En una arquitectura de microservicios con BD distribuida, 
+    # confiamos en la firma del JWT y construimos un usuario en memoria.
+    # Así evitamos consultar la tabla 'users' que solo existe en auth.db
+    return User(id=UUID(user_id), is_active=True)

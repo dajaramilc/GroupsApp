@@ -1,9 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
    GroupsApp – Frontend Application Logic
    ═══════════════════════════════════════════════════════════ */
-
-const API = 'http://52.7.253.122';  // K8s cluster gateway (EC2 #1 Elastic IP)
-
+const API = 'http://localhost:8000';  // Local API Gateway
 // ── State ─────────────────────────────────────────────────
 let state = {
     token: localStorage.getItem('token') || null,

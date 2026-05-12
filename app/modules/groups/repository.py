@@ -10,8 +10,10 @@ from app.models.group import Group, GroupMember, GroupRole
 class GroupRepository:
 
     @staticmethod
-    async def create(db: AsyncSession, name: str, description: str | None, created_by: UUID) -> Group:
+    async def create(db: AsyncSession, name: str, description: str | None, created_by: UUID, id: UUID | None = None) -> Group:
         group = Group(name=name, description=description, created_by=created_by)
+        if id:
+            group.id = id
         db.add(group)
         await db.flush()
         await db.refresh(group)

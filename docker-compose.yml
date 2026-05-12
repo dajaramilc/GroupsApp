@@ -33,6 +33,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── RabbitMQ (MOM – Message-Oriented Middleware) ────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - groupsapp-net
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── API Gateway ─────────────────────────────────────────
   api-gateway:
     image: nginx:1.25-alpine

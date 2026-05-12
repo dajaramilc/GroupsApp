@@ -1,4 +1,5 @@
 """Messages module – business logic."""
+import logging
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,10 @@ from app.modules.messages.schemas import (
 from app.modules.users.repository import UserRepository
 from app.modules.files.repository import FileRepository
 from app.modules.files.schemas import AttachmentResponse
+from app.mom.publisher import EventPublisher
+from app.mom.events import MessageSentEvent
+
+logger = logging.getLogger(__name__)
 
 
 class MessageService:
@@ -55,6 +60,16 @@ class MessageService:
                 raise ForbiddenError("Not a member of the channel's group")
 
         msg = await MessageRepository.create_channel_message(db, current_user.id, channel_id, data.content)
+
+        # MOM: Publicar evento asíncrono
+        await EventPublisher.publish(MessageSentEvent(
+            sender_id=str(current_user.id),
+            message_id=str(msg.id),
+            message_type="channel",
+            target_id=str(channel_id),
+            content_preview=data.content[:100],
+        ))
+
         return MessageResponse.model_validate(msg)
 
     @staticmethod
@@ -87,16 +102,22 @@ class MessageService:
         if not target:
             raise NotFoundError("User not found")
 
-        # Must share at least one group
-        share = await GroupRepository.users_share_group(db, current_user.id, target_user_id)
-        if not share:
-            raise ForbiddenError("You can only message users you share a group with")
+        # (Restriction removed) Any user can DM any other user
 
         conv = await MessageRepository.get_or_create_conversation(db, current_user.id, target_user_id)
         msg = await MessageRepository.create_direct_message(db, current_user.id, conv.id, data.content)
 
         # Create SENT status for recipient
         await MessageRepository.create_sent_status(db, msg.id, target_user_id)
+
+        # MOM: Publicar evento asíncrono
+        await EventPublisher.publish(MessageSentEvent(
+            sender_id=str(current_user.id),
+            message_id=str(msg.id),
+            message_type="direct",
+            target_id=str(target_user_id),
+            content_preview=data.content[:100],
+        ))
 
         resp = MessageResponse.model_validate(msg)
         resp.status = "sent"
@@ -158,9 +179,7 @@ class MessageService:
         if not target:
             raise NotFoundError("User not found")
 
-        share = await GroupRepository.users_share_group(db, current_user.id, target_user_id)
-        if not share:
-            raise ForbiddenError("You can only message users you share a group with")
+        # (Restriction removed) Any user can DM any other user
 
         conv = await MessageRepository.get_or_create_conversation(db, current_user.id, target_user_id)
         msg = await MessageRepository.create_direct_message(db, current_user.id, conv.id, "🎤 Audio")

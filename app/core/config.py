@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # ── Presence ─────────────────────────────────────────
     PRESENCE_TIMEOUT_SECONDS: int = 120  # offline after 2 min without heartbeat
 
+    # ── MOM (RabbitMQ) ────────────────────────────────────
+    RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
