@@ -43,21 +43,14 @@ class MessageService:
         db: AsyncSession, channel_id: UUID, data: SendMessageRequest, current_user: User
     ) -> MessageResponse:
         # Verificación de acceso vía gRPC (svc-messages → svc-channels)
-        # Fallback a verificación local si el RPC falla (resiliencia ante caída del servicio).
         allowed, _group_id, reason = await check_channel_access(channel_id, current_user.id)
         if reason == "grpc_unavailable":
-            # Fallback: replicar la verificación local
-            channel = await ChannelRepository.get_by_id(db, channel_id)
-            if not channel:
-                raise NotFoundError("Channel not found")
-            member = await GroupRepository.get_member(db, channel.group_id, current_user.id)
-            if not member:
-                raise ForbiddenError("Not a member of the channel's group")
-        else:
-            if reason == "channel_not_found":
-                raise NotFoundError("Channel not found")
-            if not allowed:
-                raise ForbiddenError("Not a member of the channel's group")
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Channels service (gRPC) is unavailable")
+        elif reason == "channel_not_found":
+            raise NotFoundError("Channel not found")
+        elif not allowed:
+            raise ForbiddenError("Not a member of the channel's group")
 
         msg = await MessageRepository.create_channel_message(db, current_user.id, channel_id, data.content)
 
@@ -76,12 +69,14 @@ class MessageService:
     async def list_channel_messages(
         db: AsyncSession, channel_id: UUID, current_user: User, skip: int = 0, limit: int = 50
     ) -> MessageListResponse:
-        channel = await ChannelRepository.get_by_id(db, channel_id)
-        if not channel:
+        # Verificación de acceso vía gRPC (svc-messages → svc-channels)
+        allowed, _group_id, reason = await check_channel_access(channel_id, current_user.id)
+        if reason == "grpc_unavailable":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Channels service (gRPC) is unavailable")
+        elif reason == "channel_not_found":
             raise NotFoundError("Channel not found")
-
-        member = await GroupRepository.get_member(db, channel.group_id, current_user.id)
-        if not member:
+        elif not allowed:
             raise ForbiddenError("Not a member of the channel's group")
 
         messages = await MessageRepository.list_channel_messages(db, channel_id, skip, limit)
@@ -98,9 +93,8 @@ class MessageService:
         if target_user_id == current_user.id:
             raise ForbiddenError("Cannot send messages to yourself")
 
-        target = await UserRepository.get_by_id(db, target_user_id)
-        if not target:
-            raise NotFoundError("User not found")
+        # Assume target user exists or check via REST/gRPC. 
+        # Cannot check via UserRepository because users table is in auth.db
 
         # (Restriction removed) Any user can DM any other user
 
@@ -127,9 +121,7 @@ class MessageService:
     async def list_direct_messages(
         db: AsyncSession, target_user_id: UUID, current_user: User, skip: int = 0, limit: int = 50
     ) -> MessageListResponse:
-        target = await UserRepository.get_by_id(db, target_user_id)
-        if not target:
-            raise NotFoundError("User not found")
+        # Assume target user exists
 
         conv = await MessageRepository.get_or_create_conversation(db, current_user.id, target_user_id)
         messages = await MessageRepository.list_direct_messages(db, conv.id, skip, limit)
@@ -157,12 +149,14 @@ class MessageService:
     async def send_channel_audio(
         db: AsyncSession, channel_id: UUID, current_user: User
     ) -> MessageResponse:
-        channel = await ChannelRepository.get_by_id(db, channel_id)
-        if not channel:
+        # Verificación de acceso vía gRPC (svc-messages → svc-channels)
+        allowed, _group_id, reason = await check_channel_access(channel_id, current_user.id)
+        if reason == "grpc_unavailable":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Channels service (gRPC) is unavailable")
+        elif reason == "channel_not_found":
             raise NotFoundError("Channel not found")
-
-        member = await GroupRepository.get_member(db, channel.group_id, current_user.id)
-        if not member:
+        elif not allowed:
             raise ForbiddenError("Not a member of the channel's group")
 
         msg = await MessageRepository.create_channel_message(db, current_user.id, channel_id, "🎤 Audio")
@@ -175,9 +169,7 @@ class MessageService:
         if target_user_id == current_user.id:
             raise ForbiddenError("Cannot send messages to yourself")
 
-        target = await UserRepository.get_by_id(db, target_user_id)
-        if not target:
-            raise NotFoundError("User not found")
+        # Assume target user exists
 
         # (Restriction removed) Any user can DM any other user
 
@@ -217,14 +209,12 @@ class MessageService:
         raw = await MessageRepository.list_recent_conversations(db, current_user.id)
         previews = []
         for item in raw:
-            user = await UserRepository.get_by_id(db, item["other_user_id"])
-            if not user:
-                continue
+            # Cannot fetch user details from UserRepository (auth.db)
             previews.append(ConversationPreviewResponse(
                 conversation_id=item["conversation_id"],
                 other_user_id=item["other_user_id"],
-                display_name=user.display_name,
-                username=user.username,
+                display_name="User", # Fallback
+                username="user", # Fallback
                 last_message=item["last_message"],
                 last_message_time=item["last_message_time"],
                 sender_id=item["sender_id"],

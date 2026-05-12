@@ -16,7 +16,7 @@ from app.grpc_proto import channels_pb2, channels_pb2_grpc
 
 logger = logging.getLogger(__name__)
 
-GRPC_ADDR = os.getenv("SVC_CHANNELS_GRPC_ADDR", "svc-channels:50051")
+GRPC_ADDR = os.getenv("SVC_CHANNELS_GRPC_ADDR", "localhost:50051")
 GRPC_TIMEOUT_SECONDS = float(os.getenv("SVC_CHANNELS_GRPC_TIMEOUT", "3.0"))
 
 
